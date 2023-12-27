@@ -2,7 +2,6 @@ import requests
 from decouple import config
 from bs4 import BeautifulSoup
 from collections import Counter
-from IPython.display import HTML
 import os
 import json
 import requests
@@ -20,7 +19,7 @@ search_url = "https://api.bing.microsoft.com/v7.0/search"
 key = os.environ.get('LANGUAGE_KEY')
 endpoint = os.environ.get('LANGUAGE_ENDPOINT')
 
-from azure.ai.textanalytics import TextAnalyticsClient
+from azure.ai.translation import TextAnalyticsClient
 from azure.core.credentials import AzureKeyCredential
 
 # Authenticate the client using your key and endpoint 
@@ -36,7 +35,7 @@ client = authenticate_client()
 # Example method for summarizing text
 def sample_extractive_summarization(client):
     from azure.core.credentials import AzureKeyCredential
-    from azure.ai.textanalytics import (
+    from azure.ai.translation import (
         TextAnalyticsClient,
         ExtractiveSummaryAction
     ) 
@@ -102,8 +101,8 @@ def get_translate(text):
 # 정확한 날짜를 골라서 검색 하는 것이 어렵다.
 # 너무 자주 보내면 429 에러가 뜬다.
 
-topic = 'trade'
-search_term = f"topic is {topic}, news article written in December 2023"
+topic = 'financial'
+search_term = f"{topic} issue today"
 
 headers = {"Ocp-Apim-Subscription-Key": subscription_key}
 params = {"q": search_term, "textDecorations": True, "textFormat": "HTML"}
@@ -141,9 +140,8 @@ for result in results[:10]:
     text = soup.find('body').get_text().strip()
     cleaned_text = ' '.join(text.split('\n'))
     cleaned_text = ' '.join(text.split())
-    print(cleaned_text)
-    # if len is more than 10, then can count it
     # print(cleaned_text)
+    # if len is more than 10, then can count it
     counter = Counter(x for x in cleaned_text.split() if len(x) > 5)
     # find most common elements top 10
     elements_top10 = counter.most_common(10)
@@ -253,9 +251,12 @@ if __name__ == '__main__':
     # result_list에서 정보 추출 및 send_news 함수 호출
     for news_item in result_list:
         title = re.sub(html_tag_pattern, '', news_item['name'])
+        print(f"title -> {title}")
         formatted_summary = re.sub(html_tag_pattern, '', news_item['description_trans'])
+        print(f"formatted_summary -> {formatted_summary}")
         url = news_item['url']
         news_dt = news_item['datePublished'].split('T')[0]
+        print(f"news_dt -> {news_dt}")
         source = news_item['provider']
         title_mt = re.sub(html_tag_pattern, '', news_item['name_trans'])
         send_news(now, keyword, news_dt, source, title, title_mt, formatted_summary, url, rel)

@@ -2,17 +2,22 @@ import requests
 from decouple import config
 from bs4 import BeautifulSoup
 from collections import Counter
-from IPython.display import HTML
 import os
 import json
 import requests
 import logging
 import datetime
 import re
+from azure.ai.translation.text import TextTranslationClient, TranslatorCredential
+from azure.ai.translation.text.models import InputTextItem
+from azure.core.exceptions import HttpResponseError
 
 subscription_key = config('subscription_key', default='')
 LANGUAGE_KEY = config('LANGUAGE_KEY', default='')
 LANGUAGE_ENDPOINT = config('LANGUAGE_ENDPOINT', default='')
+TRANSLATOR_KEY = config('TRANSLATOR_KEY', default='')
+API_REGION = config('API_REGION', default='')
+TRANSLATOR_ENDPOINT = config('TRANSLATOR_ENDPOINT', default='')
 
 search_url = "https://api.bing.microsoft.com/v7.0/news/search"
 # "distribution, logistics, trade, and crude oil, written in December 15th 2023"
@@ -21,9 +26,10 @@ search_url = "https://api.bing.microsoft.com/v7.0/news/search"
 # 정확한 날짜를 골라서 검색 하는 것이 어렵다.
 # 너무 자주 보내면 429 에러가 뜬다.
 # 쓸데없는 url도 보내서 정확도가 낮다.
+# bing을 통한 검색 결과를 내보내는 것으로, ai에게 질문하듯이 query를 짜는 것이 아닌, 웹검색 하듯이 query를 짜야 한다.
 
-topic = 'financial'
-search_term = f"The most relevant {topic} article written in December 2023"
+topic = 'trade'
+search_term = f"{topic} issue in UN article in December 2023"
 
 headers = {"Ocp-Apim-Subscription-Key": subscription_key}
 params = {"q": search_term, "textDecorations": True, "textFormat": "HTML"}
@@ -37,7 +43,7 @@ news_list = search_results['value']
 key = os.environ.get('LANGUAGE_KEY')
 endpoint = os.environ.get('LANGUAGE_ENDPOINT')
 
-from azure.ai.textanalytics import TextAnalyticsClient
+from azure.ai.translation import TextAnalyticsClient
 from azure.core.credentials import AzureKeyCredential
 
 # Authenticate the client using your key and endpoint 
@@ -53,7 +59,7 @@ client = authenticate_client()
 # Example method for summarizing text
 def sample_extractive_summarization(client):
     from azure.core.credentials import AzureKeyCredential
-    from azure.ai.textanalytics import (
+    from azure.ai.translation import (
         TextAnalyticsClient,
         ExtractiveSummaryAction
     ) 
@@ -89,6 +95,43 @@ def sample_extractive_summarization(client):
 
 # print(search_results)
 
+credential = TranslatorCredential(TRANSLATOR_KEY, API_REGION)
+text_translator = TextTranslationClient(TRANSLATOR_ENDPOINT=TRANSLATOR_ENDPOINT, credential=credential)
+
+def translate_text(input_text_elements, source_language, target_languages):
+    try:
+        response = text_translator.translate(
+            content=input_text_elements,
+            to=target_languages,
+            from_parameter=source_language
+        )
+        translation = response[0] if response else None
+
+        if translation:
+            translated_texts = []
+            for translated_text in translation.translations:
+                translated_texts.append({
+                    'target_language': translated_text.to,
+                    'translated_text': translated_text.text
+                })
+            return translated_texts
+        else:
+            return []
+
+    except Exception as e:
+        print(f"Translation error: {e}")
+        return []
+
+source_language = "en"
+target_languages = ["ko", "it"]
+input_text_elements = [InputTextItem(text="This is a test")]
+
+translated_texts = translate_text(input_text_elements, source_language, target_languages)
+
+if translated_texts:
+    for translated_text in translated_texts:
+        print(f"Text was translated to: '{translated_text['target_language']}' and the result is: '{translated_text['translated_text']}'.")
+
 # 파파고를 이용한 translate
 def get_translate(text):
     client_id = "qrCtFOINYuUF7VCgEKZK" # <-- client_id 기입
@@ -121,9 +164,14 @@ for news_item in news_list:
     date_published = news_item['datePublished']
     url = news_item['url']
     provider = news_item['provider'][0]['name']
-    description_trans = get_translate(description)
-    name_trans = get_translate(name)
-    result_list.append({'name': name, 'description': description, 'datePublished': date_published, 'url': url, 'provider': provider, 'description_trans': description_trans, 'name_trans': name_trans})
+    # name을 번역
+    name_translation = translate_text([InputTextItem(text=name)], source_language, target_languages)
+    translated_name = name_translation[0]['translated_text'] if name_translation else name
+
+    # description을 번역
+    description_translation = translate_text([InputTextItem(text=description)], source_language, target_languages)
+    translated_description = description_translation[0]['translated_text'] if description_translation else description
+    result_list.append({'name': name, 'description': description, 'datePublished': date_published, 'url': url, 'provider': provider, 'description_trans': translated_description, 'name_trans': translated_name})
 
 # 결과 출력
 for item in result_list:
