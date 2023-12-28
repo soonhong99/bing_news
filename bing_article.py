@@ -28,8 +28,8 @@ search_url = "https://api.bing.microsoft.com/v7.0/news/search"
 # 쓸데없는 url도 보내서 정확도가 낮다.
 # bing을 통한 검색 결과를 내보내는 것으로, ai에게 질문하듯이 query를 짜는 것이 아닌, 웹검색 하듯이 query를 짜야 한다.
 
-topic = 'trade'
-search_term = f"{topic} issue in UN article in December 2023"
+topic = 'crude oil'
+search_term = f"{topic} news in English article in December 2023"
 
 headers = {"Ocp-Apim-Subscription-Key": subscription_key}
 params = {"q": search_term, "textDecorations": True, "textFormat": "HTML"}
@@ -57,6 +57,7 @@ def authenticate_client():
 client = authenticate_client()
 
 # Example method for summarizing text
+# 현재 안쓰고있음.
 def sample_extractive_summarization(client):
     from azure.core.credentials import AzureKeyCredential
     from azure.ai.translation import (
@@ -93,8 +94,6 @@ def sample_extractive_summarization(client):
 
 # sample_extractive_summarization(client)
 
-# print(search_results)
-
 credential = TranslatorCredential(TRANSLATOR_KEY, API_REGION)
 text_translator = TextTranslationClient(TRANSLATOR_ENDPOINT=TRANSLATOR_ENDPOINT, credential=credential)
 
@@ -124,37 +123,6 @@ def translate_text(input_text_elements, source_language, target_languages):
 
 source_language = "en"
 target_languages = ["ko", "it"]
-input_text_elements = [InputTextItem(text="This is a test")]
-
-translated_texts = translate_text(input_text_elements, source_language, target_languages)
-
-if translated_texts:
-    for translated_text in translated_texts:
-        print(f"Text was translated to: '{translated_text['target_language']}' and the result is: '{translated_text['translated_text']}'.")
-
-# 파파고를 이용한 translate
-def get_translate(text):
-    client_id = "qrCtFOINYuUF7VCgEKZK" # <-- client_id 기입
-    client_secret = "cMmNOBq_i1" # <-- client_secret 기입
-
-    data = {'text' : text,
-            'source' : 'en',
-            'target': 'ko'}
-
-    url = "https://openapi.naver.com/v1/papago/n2mt"
-
-    header = {"X-Naver-Client-Id":client_id,
-              "X-Naver-Client-Secret":client_secret}
-
-    response = requests.post(url, headers=header, data=data)
-    rescode = response.status_code
-
-    if(rescode==200):
-        send_data = response.json()
-        trans_data = (send_data['message']['result']['translatedText'])
-        return trans_data
-    else:
-        print("Error Code:" , rescode)
 
 result_list = []
 
